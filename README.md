@@ -4,12 +4,17 @@ This repository is for Practical Machine Learning and Deep Learning course proje
 ## Project directory structure
 
 ├── media: photos and gifs
+
 ├── models: different models and algorithms
+
 └── zoo: trained agents
 
 
 ## TODO:
-- [ ] Implement DQN
+- [X] Implement DQN
+- [ ] Change the implementation of DQN to be more generalized for any environment
+- [ ] Add support for wandb or Tensorboard
+- [ ] Create cli interface for run_agent.py
 - [ ] Implement PPO
 - [ ] Implement A3C
 - [ ] Implement SAC
