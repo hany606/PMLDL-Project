@@ -10,6 +10,15 @@ This repository is for Practical Machine Learning and Deep Learning course proje
 └── zoo: trained agents
 
 
+### Algorithms:
+
+#### DQN:
+
+Trained Agent for cartpole
+
+![Trained Agent](https://github.com/hany606/PMLDL-Project/blob/main/media/gif/dqn.gif)
+
+
 ## TODO:
 - [X] Implement DQN
 - [ ] Change the implementation of DQN to be more generalized for any environment
