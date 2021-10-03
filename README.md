@@ -14,9 +14,19 @@ This repository is for Practical Machine Learning and Deep Learning course proje
 
 #### DQN:
 
-Trained Agent for cartpole
+Trained Agent for cartpole:
 
 ![Trained Agent](https://github.com/hany606/PMLDL-Project/blob/main/media/gif/dqn.gif)
+
+Rewards:
+
+Training reward:
+
+![Best model training](https://github.com/hany606/PMLDL-Project/blob/main/zoo/dqn/best_model_dqn.png)
+
+Testing reward:
+
+![Best model training](https://github.com/hany606/PMLDL-Project/blob/main/zoo/dqn/best_model_dqn_testing.png)
 
 
 ## TODO:
