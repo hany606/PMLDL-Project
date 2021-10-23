@@ -3,10 +3,26 @@
 import gym
 from algorithms.DQN import VanillaDQN
 import matplotlib.pyplot as plt
+import wandb
+
+
+wandb_experiment_config = {"algorithm": "DQN"}
+env_name = "MountainCar-v0"
+notes = f"Running RL algorithm ({wandb_experiment_config['algorithm']}) for env: {env_name}"
+
+wandb.init(
+        project="PMLDL-Project",
+        group=env_name,
+        config=wandb_experiment_config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        save_code=True,  # optional
+        notes=notes,
+)
 
 
 # https://github.com/openai/gym/wiki/MountainCar-v0
-env = gym.make('MountainCar-v0')
+env = gym.make(env_name)
 dqn_agent = VanillaDQN(env, hidden_dim=64)
 
 # After testing with the original reward of the environment, nothing was improved in training
@@ -18,6 +34,7 @@ dqn_agent = VanillaDQN(env, hidden_dim=64)
 # - When only the position is in the reward (or the position dominated) it makes it only try to go up not by going right and left but just go right
 # - When only the velocity is in the reward (or the velocity dominated) it makes it only to move fast right and left and don't care about the real goal (position)
 reward_shaping_func = lambda r, obs: r + abs(obs[1])*10-abs(obs[0]-0.5) 
+special_termination_condition = lambda obs: obs[0] > 0.48
 
 num_epochs = 500
 batch_size = 1000
@@ -38,6 +55,8 @@ rewards = dqn_agent.train(  return_rewards=True,
                             learning_rate=learning_rate, 
                             num_steps=num_steps,
                             reward_shaping_func=reward_shaping_func,
+                            special_termination_condition=special_termination_condition,
+                            wandb_flag=True,
                           )
 # dqn_agent.train(num_epochs=500, batch_size=128, target_update_freq=5000, render=True, eps_prob=0.1, learning_rate=0.003, num_steps=1000)
 
