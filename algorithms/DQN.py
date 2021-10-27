@@ -71,7 +71,6 @@ class VanillaDQN:
         if(restore is not None):
             self.net = torch.load(restore)
 
-
     def sample_action(self, observation):
         if(isinstance(observation, np.ndarray)):
             observation = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
@@ -91,7 +90,10 @@ class VanillaDQN:
     def train(self, render=False,
                     num_epochs=100, num_steps=1000,
                     eps_prob=0.5, target_update_freq=500, batch_size=100, gamma=0.99, learning_rate=1e-3,
-                    save_flag=False, save_file_name=None, save_file_path=None, return_rewards=False):
+                    save_flag=False, save_file_name=None, save_file_path=None, return_rewards=False,
+                    reward_shaping_func=None,
+                    special_termination_condition=None,
+                    ):
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=learning_rate)
         total_num_steps = 0
         reward_list = []
@@ -112,15 +114,12 @@ class VanillaDQN:
                     action = self.env.action_space.sample()
                 # Perform the action
                 observation, r, done, _ = self.env.step(int(action))
-                # After testing with the original reward of the environment, nothing was improved in training
-                # So, I have changed the reward function, to test different behavior and found some improvements
-                # Multiple reward functions have been tested to conform with specific needed behaviors:
-                # - Move with fast right and left -> Correlated with velocity [2nd observation]
-                # - Move closer to the goal -> Correlated with the position [1st observation]
-                # Some observations:
-                # - When only the position is in the reward (or the position dominated) it makes it only try to go up not by going right and left but just go right
-                # - When only the velocity is in the reward (or the velocity dominated) it makes it only to move fast right and left and don't care about the real goal (position)
-                reward = r + abs(observation[1])*10-abs(observation[0]-0.5) 
+                reward = 0
+                if(reward_shaping_func is None):
+                    reward = r
+                else:
+                    reward = reward_shaping_func(r, observation)
+
                 # print(reward, abs(observation[0]-0.5), abs(observation[1])*2)
                 epoch_reward += r
                 # Store the transition (s_t, a_t, r_t, s_{t+1})
@@ -139,28 +138,19 @@ class VanillaDQN:
                 if(total_num_steps % target_update_freq == 0):
                     self.target_net = deepcopy(self.net)
 
-                if(observation[0] > 0.48):
-                    print(f"Done with {observation[0]-0.5} difference between the goal=0.5")
+                if(special_termination_condition is not None and special_termination_condition(observation)):
+                    print(f"Done special termination condition")
+                    done = True
+
+                                    
+                if(done or t == num_steps-1):
                     print(f"Epoch {i+1} (reward): {epoch_reward}")
                     reward_list.append(epoch_reward)
-                    observation = self.env.reset()
-                    done = False
-                    total_reward = 0
-                    while not done:
-                        # self.env.render()
-                        action = int(self.sample_action(observation))
-                        observation, reward, done, _ = self.env.step(action)
-                        total_reward += reward
-                    print(f"Epoch {i+1} (Test reward): {total_reward}")
-                    if(self.best_reward < (total_reward+epoch_reward)/2 and save_flag):
+                    if(self.best_reward < epoch_reward and save_flag):
                         self.save(save_file_path, save_file_name)
-                        self.best_reward = (total_reward+epoch_reward)/2
-                    break         
-                
-                if(t == num_steps-1 or reward == 0):
-                    reward_list.append(epoch_reward)
-                    print(f"Epoch {i+1} (reward): {epoch_reward}")
+                        self.best_reward = epoch_reward
                     break
+
         if(return_rewards):
             return reward_list
 
