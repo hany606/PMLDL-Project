@@ -4,9 +4,6 @@
 # http://rail.eecs.berkeley.edu/deeprlcourse/static/slides/lec-8.pdf
 # https://github.com/openai/gym/wiki/MountainCar-v0
 
-# TODO:
-# - Use Wandb to report the results 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
