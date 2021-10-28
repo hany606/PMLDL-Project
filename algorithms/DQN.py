@@ -15,6 +15,7 @@ import numpy as np
 from copy import deepcopy
 import random
 from math import tanh
+import wandb
 # from torch.utils.tensorboard import SummaryWriter
 
 np.random.seed(0)
@@ -93,6 +94,7 @@ class VanillaDQN:
                     save_flag=False, save_file_name=None, save_file_path=None, return_rewards=False,
                     reward_shaping_func=None,
                     special_termination_condition=None,
+                    wandb_flag=False
                     ):
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=learning_rate)
         total_num_steps = 0
@@ -145,6 +147,8 @@ class VanillaDQN:
                                     
                 if(done or t == num_steps-1):
                     print(f"Epoch {i+1} (reward): {epoch_reward}")
+                    if(wandb_flag):
+                        wandb.log({"epoch_reward": epoch_reward})
                     reward_list.append(epoch_reward)
                     if(self.best_reward < epoch_reward and save_flag):
                         self.save(save_file_path, save_file_name)
@@ -160,4 +164,3 @@ class VanillaDQN:
 
 if __name__ == '__main__':
     pass
-    
