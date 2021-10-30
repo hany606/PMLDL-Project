@@ -120,7 +120,7 @@ class VanillaDQN:
                     reward = reward_shaping_func(r, observation)
 
                 # print(reward, abs(observation[0]-0.5), abs(observation[1])*2)
-                epoch_reward += r
+                epoch_reward += reward
                 # Store the transition (s_t, a_t, r_t, s_{t+1})
                 self.replay.add(list(deepcopy(obs)), list([action]), reward, list(observation))
                 obs = deepcopy(observation)
