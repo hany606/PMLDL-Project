@@ -5,7 +5,8 @@
  
 
 import gym
-from models.DQN import VanillaDQN
+from algorithms.DQN import VanillaDQN
+from algorithms.PPO import PPO
 from torch import load
 from time import time
 import matplotlib.pyplot as plt
@@ -39,7 +40,10 @@ def get_action(state, policy=None):
 
 # https://github.com/openai/gym/wiki/MountainCar-v0
 env = gym.make('MountainCar-v0')
-dqn_agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn")
+algorithm = "dqn"
+agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn")
+# algorithm = "ppo"
+# agent = PPO(env, restore={"actor":"zoo/ppo/actor_ppobest_model_ppo", "critic":"zoo/ppo/critic_ppobest_model_ppo"})
 
 
 observation = env.reset()
@@ -49,10 +53,10 @@ total_reward = 0
 frames = []
 while not done:
     frames.append(env.render(mode = 'rgb_array'))
-    action = get_action(observation, dqn_agent)
+    action = get_action(observation, agent)
     observation, reward, done, _ = env.step(action)
     total_reward += reward
-display_frames_as_gif(frames, "media/gif/dqn.gif")
+display_frames_as_gif(frames, f"media/gif/{algorithm}.gif")
 print(f"Total reward: {total_reward}, Done flag: {done}")
 
 
@@ -62,7 +66,7 @@ for i in range(100):
     done = False
     total_reward = 0
     while not done:
-        action = get_action(observation, dqn_agent)
+        action = get_action(observation, agent)
         observation, reward, done, _ = env.step(action)
         total_reward += reward
     rewards_list.append(total_reward)

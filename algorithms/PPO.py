@@ -190,6 +190,11 @@ class PPO:
         action = torch.squeeze(action).item()
         value = torch.squeeze(value).item()
         return action, probs, value
+    def sample_action(self, observation):
+        state = torch.tensor([observation], dtype=torch.float).to(self.actor_net.device)
+        distribution = self.actor_net(state)
+        action = distribution.sample()
+        return action.item()
 
     def _collect_rollout(self, render=False, reward_shaping_func=None, special_termination_condition=None, num_steps=None):
         observation = self.env.reset()
