@@ -8,7 +8,7 @@ import wandb
 import argparse
 
 parser = argparse.ArgumentParser(description="Train without any sim2real extra methods")
-parser.add_argument('--alog', type=str, help="Enter the algorithm name")
+parser.add_argument('--algo', type=str, help="Enter the algorithm name")
 parser.add_argument('--env', default="mountaincar", type=str, help="Enter the environment name")
 args = parser.parse_args()
 
