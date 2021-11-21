@@ -49,6 +49,8 @@ special_termination_condition = lambda obs: obs[0] > 0.48
 # https://github.com/openai/gym/wiki/MountainCar-v0
 env = gym.make(env_name)
 
+agent = None
+
 if(algorithm == "dqn"):
         num_epochs = 500
         batch_size = 1000
@@ -98,3 +100,16 @@ plt.xlabel("Epochs")
 plt.ylabel("Reward")
 plt.savefig("./zoo/ppo/best_model_ppo.png")
 plt.show()
+
+
+observation = env.reset()
+
+done = False
+total_reward = 0
+frames = []
+while not done:
+    frames.append(env.render(mode = 'rgb_array'))
+    action = agent.sample_action(observation)
+    observation, reward, done, _ = env.step(action)
+    total_reward += reward
+print(f"Total reward: {total_reward}, Done flag: {done}")
