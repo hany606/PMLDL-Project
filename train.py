@@ -5,29 +5,34 @@ from algorithms.DQN import VanillaDQN
 from algorithms.PPO import PPO
 import matplotlib.pyplot as plt
 import wandb
+import argparse
+
+parser = argparse.ArgumentParser(description="Train without any sim2real extra methods")
+parser.add_argument('--alog', type=str, help="Enter the algorithm name")
+parser.add_argument('--env', default="mountaincar", type=str, help="Enter the environment name")
+args = parser.parse_args()
 
 
-wandb_experiment_config = {"algorithm": 
-                                        "PPO"#"DQN"
+algorithm = args.algo.lower()
+envs_dict = {"mountaincar": "MountainCar-v0", "acrobot":"Acrobot-v1", "cartpole":"Cartpole-v1"} 
+wandb_flag = True
+wandb_experiment_config = {"algorithm": algorithm,
+                           "wandb": wandb_flag, 
                           }
-env_name = "MountainCar-v0"
+env_name = envs_dict[args.env]
 notes = f"Running RL algorithm ({wandb_experiment_config['algorithm']}) for env: {env_name}"
 
-wandb.init(
-        project="PMLDL-Project",
-        group=env_name+f"_{wandb_experiment_config['algorithm']}",
-        config=wandb_experiment_config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        monitor_gym=True,  # auto-upload the videos of agents playing the game
-        save_code=True,  # optional
-        notes=notes,
-)
+if(wandb_flag):
+        wandb.init(
+                project="PMLDL-Project",
+                group=env_name+f"_{wandb_experiment_config['algorithm']}",
+                config=wandb_experiment_config,
+                sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+                monitor_gym=True,  # auto-upload the videos of agents playing the game
+                save_code=True,  # optional
+                notes=notes,
+        )
 
-
-# https://github.com/openai/gym/wiki/MountainCar-v0
-env = gym.make(env_name)
-# dqn_agent = VanillaDQN(env, hidden_dim=64)
-ppo_agent = PPO(env)
 
 # After testing with the original reward of the environment, nothing was improved in training
 # So, I have changed the reward function, to test different behavior and found some improvements
@@ -40,43 +45,56 @@ ppo_agent = PPO(env)
 reward_shaping_func = lambda r, obs: r + abs(obs[1])*10-abs(obs[0]-0.5) 
 special_termination_condition = lambda obs: obs[0] > 0.48
 
-num_epochs = 500
-batch_size = 1000
-target_update_freq = 5000
-eps_prob = 0.1000
-learning_rate = 0.003
-num_steps = 200
-# With num_steps=200 it improved the training and increased the reward
-# rewards = dqn_agent.train(  return_rewards=True, 
-#                             save_flag=True, 
-#                             render=False, 
-#                             save_file_path="./zoo/dqn/", 
-#                             save_file_name="best_model_dqn",
-#                             num_epochs=num_epochs, 
-#                             batch_size=batch_size, 
-#                             target_update_freq=target_update_freq,  
-#                             eps_prob=eps_prob, 
-#                             learning_rate=learning_rate, 
-#                             num_steps=num_steps,
-#                             reward_shaping_func=reward_shaping_func,
-#                             special_termination_condition=special_termination_condition,
-#                             wandb_flag=True,
-#                           )
-rewards = ppo_agent.train(  return_rewards=True, 
-                            save_flag=True, 
-                            render=False, 
-                            save_file_path="./zoo/ppo/", 
-                            save_file_name="best_model_ppo",
-                            reward_shaping_func=reward_shaping_func,
-                            special_termination_condition=special_termination_condition,
-                            wandb_flag=True,
-                            num_steps = num_steps,
-                          )
+
+# https://github.com/openai/gym/wiki/MountainCar-v0
+env = gym.make(env_name)
+
+if(algorithm == "dqn"):
+        num_epochs = 500
+        batch_size = 1000
+        target_update_freq = 5000
+        eps_prob = 0.1000
+        learning_rate = 0.003
+        num_steps = 200
+        agent = VanillaDQN(env, hidden_dim=64)
+        # With num_steps=200 it improved the training and increased the reward
+        rewards = agent.train(  return_rewards=True, 
+                                        save_flag=True, 
+                                        render=False, 
+                                        save_file_path="./zoo/dqn/", 
+                                        save_file_name="best_model_dqn",
+                                        num_epochs=num_epochs, 
+                                        batch_size=batch_size, 
+                                        target_update_freq=target_update_freq,  
+                                        eps_prob=eps_prob, 
+                                        learning_rate=learning_rate, 
+                                        num_steps=num_steps,
+                                        reward_shaping_func=reward_shaping_func,
+                                        special_termination_condition=special_termination_condition,
+                                        wandb_flag=wandb_flag,
+                                        )
+elif(algorithm == "ppo"):
+        num_epochs = 500
+        batch_size = 64
+        learning_rate = 0.003
+        num_steps = 200
+
+        agent = PPO(env, lr=learning_rate, n_steps=num_steps, batch_size=batch_size, n_epochs=num_epochs)
+        rewards = agent.train(  return_rewards=True, 
+                                save_flag=True, 
+                                render=False, 
+                                save_file_path="./zoo/ppo/", 
+                                save_file_name="best_model_ppo",
+                                reward_shaping_func=None,
+                                special_termination_condition=None,
+                                wandb_flag=wandb_flag,
+                                num_steps = num_steps,
+                                )
 
 # dqn_agent.train(num_epochs=500, batch_size=128, target_update_freq=5000, render=True, eps_prob=0.1, learning_rate=0.003, num_steps=1000)
 
-# plt.plot([i+1 for i in range(num_epochs)], rewards)
-# plt.xlabel("Epochs")
-# plt.ylabel("Reward")
-# plt.savefig("./zoo/dqn/best_model_dqn.png")
-# plt.show()
+plt.plot([i+1 for i in range(num_epochs)], rewards)
+plt.xlabel("Epochs")
+plt.ylabel("Reward")
+plt.savefig("./zoo/ppo/best_model_ppo.png")
+plt.show()
