@@ -80,7 +80,7 @@ class Memory:
     def get(self):
         pass
 
-
+# ----------------------------- Networks -----------------------------
 class Network(nn.Module):
     def __init__(self, 
                  observations_dim, actions_dim,
@@ -88,13 +88,17 @@ class Network(nn.Module):
                  lr=1e-3, device=None):
         super(Network, self).__init__()
         self.input_layer = nn.Linear(observations_dim, inp_hidden_dim)
-        self.output_layer = nn.Linear(out_hidden_dim,actions_dim)
+        self.output_layer = nn.Linear(out_hidden_dim, actions_dim)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") if device is None else device
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        self.lr = lr
 
     def _to(self):
         print(f"## Device: {self.device}")
         self.to(self.device)
+
+    def _init_optimizer(self):
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+
 
     def forward(self, x):
         raise NotImplementedError("Implementation of forward for the network")
@@ -102,10 +106,11 @@ class Network(nn.Module):
 class ActorNetwork(Network):
     def __init__(self, *args, **kwargs):
         kwargs["inp_hidden_dim"] = 512
-        kwargs["out_hidden_dim"] = 256
+        kwargs["out_hidden_dim"] = 128
         super(ActorNetwork, self).__init__(*args, **kwargs)
         self.fc1 = nn.Linear(512, 256)
-        self.fc2 = nn.Linear(256, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self._init_optimizer()
         self._to()
 
     def forward(self, x):
@@ -113,9 +118,8 @@ class ActorNetwork(Network):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.output_layer(x)
-        dist = F.softmax(x, dim=-1)
-
-        dist = Categorical(dist)
+        probs = F.softmax(x, dim=-1)
+        dist = Categorical(probs)
         
         return dist
 
@@ -123,12 +127,12 @@ class ActorNetwork(Network):
 class CriticNetwork(Network):
     def __init__(self, *args, **kwargs):
         kwargs["inp_hidden_dim"] = 512
-        kwargs["out_hidden_dim"] = 256
+        kwargs["out_hidden_dim"] = 128
         super(CriticNetwork, self).__init__(*args, **kwargs)
         self.fc1 = nn.Linear(512, 256)
-        self.fc2 = nn.Linear(256, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self._init_optimizer()
         self._to()
-
 
     def forward(self, x):
         x = F.relu(self.input_layer(x))
@@ -136,6 +140,7 @@ class CriticNetwork(Network):
         x = F.relu(self.fc2(x))
         x = self.output_layer(x)
         return x
+# --------------------------------------------------------------
 
 class PPO:
     def __init__(self, env, device=None,
@@ -192,13 +197,19 @@ class PPO:
         action = torch.squeeze(action).item()
         value = torch.squeeze(value).item()
         return action, probs, value
+
     def sample_action(self, observation):
         state = torch.tensor([observation], dtype=torch.float).to(self.actor_net.device)
         distribution = self.actor_net(state)
         action = distribution.sample()
         return action.item()
 
-    def _collect_rollout(self, render=False, reward_shaping_func=None, special_termination_condition=None, num_steps=None):
+    def _collect_rollout(self, 
+                         render=False,
+                         reward_shaping_func=None, 
+                         special_termination_condition=None, 
+                         num_steps=200):
+        # Throw away the old collected data (old batch)
         self.rollout_buffer.reset()
         total_num_steps = 0
         while total_num_steps < num_steps:
@@ -224,7 +235,7 @@ class PPO:
                 if(special_termination_condition is not None and special_termination_condition(observation)):
                         print(f"Done special termination condition")
                         done = True
-                if(done or (num_steps is not None and total_num_steps == num_steps-1)):
+                if(done or total_num_steps >= num_steps):
                     break
         return total_num_steps, epoch_reward
 
@@ -233,15 +244,22 @@ class PPO:
                     reward_shaping_func=None,
                     num_steps = None,
                     special_termination_condition=None,
-                    wandb_flag=False
+                    wandb_flag=False,
+                    update_num_epochs=1
                     ):
 
         total_num_steps = 0
         reward_list = []
-        while self.n_steps > total_num_steps:
-            epoch_steps, epoch_reward = self._collect_rollout(render=render, reward_shaping_func=reward_shaping_func, special_termination_condition=special_termination_condition, num_steps=num_steps)
-            print(f"Epoch {total_num_steps} (reward): {epoch_reward}")
-            total_num_steps += 1
+        # Training loop
+        for epoch in range(self.n_epochs):
+            # Collect the training batch 
+            epoch_steps, epoch_reward = self._collect_rollout(render=render,
+                                                              reward_shaping_func=reward_shaping_func,
+                                                              special_termination_condition=special_termination_condition, 
+                                                              num_steps=num_steps)
+
+            print(f"Epoch {epoch} (reward): {epoch_reward}")
+            total_num_steps += epoch_steps
             if(wandb_flag):
                 wandb.log({"epoch_reward": epoch_reward})
             reward_list.append(epoch_reward)
@@ -249,8 +267,10 @@ class PPO:
                 self.save(save_file_path, save_file_name)
                 self.best_reward = epoch_reward
 
-            for epoch in range(self.n_epochs):
+            for epoch in range(update_num_epochs):
                 states, rewards, dones, actions, old_probs, values, num_batches = self.rollout_buffer.sample(batch_size=self.batch_size)
+                print(states.shape)
+                # TODO: a bug
                 for batch in range(num_batches):
                     # print(len(rewards[batch]), len(dones[batch]), len(values[batch]))
                     advantage = self._comput_advatage(rewards[batch], dones[batch], values[batch])
