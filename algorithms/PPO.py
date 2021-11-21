@@ -44,6 +44,8 @@ class Memory:
     def sample(self, batch_size=64):
         data_length = self.len()
         batch_start = np.arange(0, data_length, batch_size)
+        # print(batch_size)
+        # print(batch_start.shape)
         indicies = np.arange(data_length, dtype=np.int64)
         batches = [indicies[i:i+batch_size] for i in batch_start]        
         state_batches = []
@@ -60,12 +62,12 @@ class Memory:
             prob_batch = []
             val_batch = []
             for batch_idx in batch:
-                state_batch.append(self.states[batch_idx])
-                reward_batch.append(self.rewards[batch_idx])
-                done_batch.append(self.dones[batch_idx])
-                action_batch.append(self.actions[batch_idx])
-                prob_batch.append(self.probs[batch_idx])
-                val_batch.append(self.values[batch_idx])
+                state_batch.append(np.array(self.states[batch_idx]))
+                reward_batch.append(np.array(self.rewards[batch_idx]))
+                done_batch.append(np.array(self.dones[batch_idx]))
+                action_batch.append(np.array(self.actions[batch_idx]))
+                prob_batch.append(np.array(self.probs[batch_idx]))
+                val_batch.append(np.array(self.values[batch_idx]))
             state_batches.append(np.array(state_batch))
             reward_batches.append(np.array(reward_batch))
             done_batches.append(np.array(done_batch))
@@ -197,32 +199,33 @@ class PPO:
         return action.item()
 
     def _collect_rollout(self, render=False, reward_shaping_func=None, special_termination_condition=None, num_steps=None):
-        observation = self.env.reset()
         self.rollout_buffer.reset()
         total_num_steps = 0
-        done = False
-        epoch_reward = 0
-        while not done:
-            if(render):
-                self.env.render()
-            total_num_steps += 1
-            action, prob, value = self.get_action(observation)
-            observation, r, done, _ = self.env.step(action)
+        while total_num_steps < num_steps:
+            observation = self.env.reset()
+            done = False
+            epoch_reward = 0
+            while not done:
+                if(render):
+                    self.env.render()
+                total_num_steps += 1
+                action, prob, value = self.get_action(observation)
+                observation, r, done, _ = self.env.step(action)
 
 
-            reward = 0
-            if(reward_shaping_func is None):
-                reward = r
-            else:
-                reward = reward_shaping_func(r, observation)
-            self.rollout_buffer.add(observation, reward, done, action, prob, value)
+                reward = 0
+                if(reward_shaping_func is None):
+                    reward = r
+                else:
+                    reward = reward_shaping_func(r, observation)
+                self.rollout_buffer.add(observation, reward, done, action, prob, value)
 
-            epoch_reward += reward
-            if(special_termination_condition is not None and special_termination_condition(observation)):
-                    print(f"Done special termination condition")
-                    done = True
-            if(done or (num_steps is not None and total_num_steps == num_steps-1)):
-                break
+                epoch_reward += reward
+                if(special_termination_condition is not None and special_termination_condition(observation)):
+                        print(f"Done special termination condition")
+                        done = True
+                if(done or (num_steps is not None and total_num_steps == num_steps-1)):
+                    break
         return total_num_steps, epoch_reward
 
     def train(self, render=False,
@@ -247,12 +250,12 @@ class PPO:
                 self.best_reward = epoch_reward
 
             for epoch in range(self.n_epochs):
-                states, rewards, dones, actions, old_probs, values, num_batches = self.rollout_buffer.sample()
-                for batch in range(1):
+                states, rewards, dones, actions, old_probs, values, num_batches = self.rollout_buffer.sample(batch_size=self.batch_size)
+                for batch in range(num_batches):
                     # print(len(rewards[batch]), len(dones[batch]), len(values[batch]))
                     advantage = self._comput_advatage(rewards[batch], dones[batch], values[batch])
                     advantage = torch.tensor(advantage).to(self.actor_net.device)
-                    values = torch.tensor(values[batch]).to(self.actor_net.device)
+                    values_tensor = torch.tensor(values[batch]).to(self.actor_net.device)
                     # for b in range(len(rewards[batch])):
                     state = torch.tensor(states[batch], dtype=torch.float).to(self.actor_net.device)
                     old_prob = torch.tensor(old_probs[batch]).to(self.actor_net.device)
@@ -269,7 +272,7 @@ class PPO:
                     # clipped surrogate loss
                     actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean()
 
-                    returns = advantage[batch] + values[batch]
+                    returns = advantage[batch] + values_tensor[batch]
                     critic_loss = (returns-critic_value)**2
                     critic_loss = critic_loss.mean()
 
