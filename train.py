@@ -14,8 +14,8 @@ args = parser.parse_args()
 
 
 algorithm = args.algo.lower()
-envs_dict = {"mountaincar": "MountainCar-v0", "acrobot":"Acrobot-v1", "cartpole":"Cartpole-v1"} 
-wandb_flag = True
+envs_dict = {"mountaincar": "MountainCar-v0", "acrobot":"Acrobot-v1", "cartpole":"CartPole-v1"} 
+wandb_flag = False#True
 wandb_experiment_config = {"algorithm": algorithm,
                            "wandb": wandb_flag, 
                           }
@@ -77,20 +77,22 @@ if(algorithm == "dqn"):
                                         )
 elif(algorithm == "ppo"):
         num_epochs = 500
-        batch_size = 64
-        learning_rate = 0.003
-        num_steps = 200
+        batch_size = 5
+        learning_rate = 0.0003
+        num_steps = int(500)
+        update_num_epochs = 4
 
         agent = PPO(env, lr=learning_rate, n_steps=num_steps, batch_size=batch_size, n_epochs=num_epochs)
         rewards = agent.train(  return_rewards=True, 
                                 save_flag=True, 
                                 render=False, 
-                                save_file_path="./zoo/ppo/", 
+                                save_file_path=f"./zoo/ppo/{args.env}", 
                                 save_file_name="best_model_ppo",
-                                reward_shaping_func=None,
-                                special_termination_condition=None,
+                                reward_shaping_func=None,#reward_shaping_func,
+                                special_termination_condition=None,#special_termination_condition,
                                 wandb_flag=wandb_flag,
                                 num_steps = num_steps,
+                                update_num_epochs=update_num_epochs
                                 )
 
 # dqn_agent.train(num_epochs=500, batch_size=128, target_update_freq=5000, render=True, eps_prob=0.1, learning_rate=0.003, num_steps=1000)
@@ -98,7 +100,7 @@ elif(algorithm == "ppo"):
 plt.plot([i+1 for i in range(num_epochs)], rewards)
 plt.xlabel("Epochs")
 plt.ylabel("Reward")
-plt.savefig("./zoo/ppo/best_model_ppo.png")
+plt.savefig(f"./zoo/ppo/{args.env}/best_model_ppo.png")
 plt.show()
 
 

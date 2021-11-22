@@ -46,8 +46,9 @@ class Memory:
         batch_start = np.arange(0, data_length, batch_size)
         # print(batch_size)
         # print(batch_start.shape)
-        indicies = np.arange(data_length, dtype=np.int64)
-        batches = [indicies[i:i+batch_size] for i in batch_start]        
+        indices = np.arange(data_length, dtype=np.int64)
+        np.random.shuffle(indices) 
+        batches = [indices[i:i+batch_size] for i in batch_start]     
         state_batches = []
         reward_batches = []
         done_batches = []
@@ -98,6 +99,7 @@ class Network(nn.Module):
 
     def _init_optimizer(self):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        print(self.parameters)
 
 
     def forward(self, x):
@@ -201,8 +203,8 @@ class PPO:
     def sample_action(self, observation):
         state = torch.tensor([observation], dtype=torch.float).to(self.actor_net.device)
         distribution = self.actor_net(state)
-        action = distribution.sample()
-        return action.item()
+        action = torch.squeeze(distribution.sample()).item()
+        return action
 
     def _collect_rollout(self, 
                          render=False,
@@ -212,6 +214,7 @@ class PPO:
         # Throw away the old collected data (old batch)
         self.rollout_buffer.reset()
         total_num_steps = 0
+        epochs_reward = []
         while total_num_steps < num_steps:
             observation = self.env.reset()
             done = False
@@ -229,15 +232,24 @@ class PPO:
                     reward = r
                 else:
                     reward = reward_shaping_func(r, observation)
-                self.rollout_buffer.add(observation, reward, done, action, prob, value)
 
-                epoch_reward += reward
                 if(special_termination_condition is not None and special_termination_condition(observation)):
                         print(f"Done special termination condition")
                         done = True
+                print(observation)
+                print(reward)
+                print(done)
+                print(f"action: {action}")
+                print(prob)
+                print(value)
+                self.rollout_buffer.add(observation, reward, done, action, prob, value)
+
+                epoch_reward += reward
                 if(done or total_num_steps >= num_steps):
                     break
-        return total_num_steps, epoch_reward
+            epochs_reward.append(epoch_reward)
+            print(f"Num of episodes: {len(epochs_reward)}")
+        return total_num_steps, np.mean(epochs_reward)
 
     def train(self, render=False,
                     save_flag=False, save_file_name=None, save_file_path=None, return_rewards=False,
@@ -247,6 +259,7 @@ class PPO:
                     wandb_flag=False,
                     update_num_epochs=1
                     ):
+        # epochs_
 
         total_num_steps = 0
         reward_list = []
@@ -269,12 +282,12 @@ class PPO:
 
             for epoch in range(update_num_epochs):
                 states, rewards, dones, actions, old_probs, values, num_batches = self.rollout_buffer.sample(batch_size=self.batch_size)
-                print(states.shape)
-                # TODO: a bug
+                advantage = self._comput_advatage(self.rollout_buffer.rewards, self.rollout_buffer.dones, self.rollout_buffer.values)
+                advantage = torch.tensor(advantage).to(self.actor_net.device)
+
                 for batch in range(num_batches):
                     # print(len(rewards[batch]), len(dones[batch]), len(values[batch]))
-                    advantage = self._comput_advatage(rewards[batch], dones[batch], values[batch])
-                    advantage = torch.tensor(advantage).to(self.actor_net.device)
+
                     values_tensor = torch.tensor(values[batch]).to(self.actor_net.device)
                     # for b in range(len(rewards[batch])):
                     state = torch.tensor(states[batch], dtype=torch.float).to(self.actor_net.device)
@@ -292,7 +305,7 @@ class PPO:
                     # clipped surrogate loss
                     actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean()
 
-                    returns = advantage[batch] + values_tensor[batch]
+                    returns = advantage[batch] + values_tensor
                     critic_loss = (returns-critic_value)**2
                     critic_loss = critic_loss.mean()
 
