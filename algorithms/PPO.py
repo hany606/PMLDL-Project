@@ -47,7 +47,7 @@ class Memory:
         # print(batch_size)
         # print(batch_start.shape)
         indices = np.arange(data_length, dtype=np.int64)
-        np.random.shuffle(indices) 
+        # np.random.shuffle(indices) 
         batches = [indices[i:i+batch_size] for i in batch_start]     
         state_batches = []
         reward_batches = []
@@ -224,7 +224,7 @@ class PPO:
                     self.env.render()
                 total_num_steps += 1
                 action, prob, value = self.get_action(observation)
-                observation, r, done, _ = self.env.step(action)
+                observation_, r, done, _ = self.env.step(action)
 
 
                 reward = 0
@@ -234,21 +234,22 @@ class PPO:
                     reward = reward_shaping_func(r, observation)
 
                 if(special_termination_condition is not None and special_termination_condition(observation)):
-                        print(f"Done special termination condition")
+                        # print(f"Done special termination condition")
                         done = True
-                print(observation)
-                print(reward)
-                print(done)
-                print(f"action: {action}")
-                print(prob)
-                print(value)
+                # print(observation)
+                # print(reward)
+                # print(done)
+                # print(f"action: {action}")
+                # print(prob)
+                # print(value)
                 self.rollout_buffer.add(observation, reward, done, action, prob, value)
+                observation = observation_
 
                 epoch_reward += reward
                 if(done or total_num_steps >= num_steps):
                     break
             epochs_reward.append(epoch_reward)
-            print(f"Num of episodes: {len(epochs_reward)}")
+            # print(f"Num of episodes: {len(epochs_reward)}")
         return total_num_steps, np.mean(epochs_reward)
 
     def train(self, render=False,
@@ -271,7 +272,7 @@ class PPO:
                                                               special_termination_condition=special_termination_condition, 
                                                               num_steps=num_steps)
 
-            print(f"Epoch {epoch} (reward): {epoch_reward}")
+            print(f"Epoch {epoch} (reward): {epoch_reward}, (mean of last 100 epoch) {np.mean(reward_list[-100:])}")
             total_num_steps += epoch_steps
             if(wandb_flag):
                 wandb.log({"epoch_reward": epoch_reward})
@@ -280,7 +281,7 @@ class PPO:
                 self.save(save_file_path, save_file_name)
                 self.best_reward = epoch_reward
 
-            for epoch in range(update_num_epochs):
+            for update_epoch in range(update_num_epochs):
                 states, rewards, dones, actions, old_probs, values, num_batches = self.rollout_buffer.sample(batch_size=self.batch_size)
                 advantage = self._comput_advatage(self.rollout_buffer.rewards, self.rollout_buffer.dones, self.rollout_buffer.values)
                 advantage = torch.tensor(advantage).to(self.actor_net.device)
@@ -315,6 +316,83 @@ class PPO:
                     total_loss.backward()
                     self.actor_net.optimizer.step()
                     self.critic_net.optimizer.step()
+        if(return_rewards):
+            return reward_list
+
+    def train2(self, render=False,
+                    save_flag=False, save_file_name=None, save_file_path=None, return_rewards=False,
+                    reward_shaping_func=None,
+                    num_steps = None,
+                    special_termination_condition=None,
+                    wandb_flag=False,
+                    update_num_epochs=1
+                    ):
+        # epochs_
+
+        total_num_steps = 0
+        reward_list = []
+        N = 20
+        
+        # Training loop
+        for epoch in range(self.n_epochs):
+            observation = self.env.reset()
+            done = False
+            epoch_reward = 0
+            while not done:
+                action, prob, val = self.get_action(observation)
+                observation_, reward, done, info = self.env.step(action)
+                total_num_steps += 1
+                epoch_reward += reward
+                self.rollout_buffer.add(observation, reward, done, action, prob, val)
+                if total_num_steps % N == 0:
+
+                    for update_epoch in range(update_num_epochs):
+                        states, rewards, dones, actions, old_probs, values, num_batches = self.rollout_buffer.sample(batch_size=self.batch_size)
+                        advantage = self._comput_advatage(self.rollout_buffer.rewards, self.rollout_buffer.dones, self.rollout_buffer.values)
+                        advantage = torch.tensor(advantage).to(self.actor_net.device)
+
+                        for batch in range(num_batches):
+                            # print(len(rewards[batch]), len(dones[batch]), len(values[batch]))
+
+                            values_tensor = torch.tensor(values[batch]).to(self.actor_net.device)
+                            # for b in range(len(rewards[batch])):
+                            state = torch.tensor(states[batch], dtype=torch.float).to(self.actor_net.device)
+                            old_prob = torch.tensor(old_probs[batch]).to(self.actor_net.device)
+                            action = torch.tensor(actions[batch]).to(self.actor_net.device)
+
+                            distribution = self.actor_net(state)
+                            critic_value = torch.squeeze(self.critic_net(state))
+                            new_probs = distribution.log_prob(action)
+
+                            prob_ratio = new_probs.exp() / old_prob.exp()
+
+                            weighted_probs = advantage[batch] * prob_ratio
+                            weighted_clipped_probs = torch.clamp(prob_ratio, 1-self.clip_range, 1+self.clip_range)*advantage[batch]
+                            # clipped surrogate loss
+                            actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean()
+
+                            returns = advantage[batch] + values_tensor
+                            critic_loss = (returns-critic_value)**2
+                            critic_loss = critic_loss.mean()
+
+                            total_loss = actor_loss + self.vf_coef*critic_loss
+                            self.actor_net.optimizer.zero_grad()
+                            self.critic_net.optimizer.zero_grad()
+                            total_loss.backward()
+                            self.actor_net.optimizer.step()
+                            self.critic_net.optimizer.step()                    
+                    self.rollout_buffer.reset()
+
+                observation = observation_
+            reward_list.append(epoch_reward)
+            avg_score = np.mean(reward_list[-100:])
+            print(f"Epoch {epoch} (reward): {epoch_reward}, (mean of last 100 epoch) {np.mean(reward_list[-100:])}")
+            if(wandb_flag):
+                wandb.log({"epoch_reward": epoch_reward})
+            reward_list.append(epoch_reward)
+            if(self.best_reward < epoch_reward and save_flag):
+                self.save(save_file_path, save_file_name)
+                self.best_reward = epoch_reward
         if(return_rewards):
             return reward_list
 

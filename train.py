@@ -83,7 +83,7 @@ elif(algorithm == "ppo"):
         update_num_epochs = 4
 
         agent = PPO(env, lr=learning_rate, n_steps=num_steps, batch_size=batch_size, n_epochs=num_epochs)
-        rewards = agent.train(  return_rewards=True, 
+        rewards = agent.train2(  return_rewards=True, 
                                 save_flag=True, 
                                 render=False, 
                                 save_file_path=f"./zoo/ppo/{args.env}", 
