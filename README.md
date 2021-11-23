@@ -31,10 +31,9 @@ Testing reward:
 
 ## TODO:
 - [X] Implement DQN
-- [ ] Change the implementation of DQN to be more generalized for any environment
-- [ ] Add support for wandb or Tensorboard
-- [ ] Create cli interface for run_agent.py
-- [ ] Implement PPO
-- [ ] Implement A3C
-- [ ] Implement SAC
-- [ ] Create Benchmark using different envs and between different agorithms
+- [X] Change the implementation of DQN to be more generalized for any environment
+- [X] Add support for wandb or Tensorboard
+- [X] Create cli interface for run_agent.py
+- [X] Implement PPO
+- [0.3] Implement SAC
+- [0.5] Create Benchmark using different envs and between different agorithms
