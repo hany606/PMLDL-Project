@@ -5,12 +5,23 @@
  
 
 import gym
+import numpy as np
 from algorithms.DQN import VanillaDQN
 from algorithms.PPO import PPO
 from torch import load
 from time import time
 import matplotlib.pyplot as plt
 from matplotlib import animation
+import argparse
+from time import sleep
+
+parser = argparse.ArgumentParser(description="Train without any sim2real extra methods")
+parser.add_argument('--algo', type=str, help="Enter the algorithm name")
+parser.add_argument('--env', default="mountaincar", type=str, help="Enter the environment name")
+args = parser.parse_args()
+algorithm = args.algo.lower()
+envs_dict = {"mountaincar": "MountainCar-v0", "acrobot":"Acrobot-v1", "cartpole":"CartPole-v1"} 
+env_name = envs_dict[args.env]
 
 
 # Source: http://www.pinchofintelligence.com/getting-started-openai-gym/
@@ -38,16 +49,14 @@ def get_action(state, policy=None):
     else:
         return policy.sample_action(state)
 
-# https://github.com/openai/gym/wiki/MountainCar-v0
-env = gym.make('MountainCar-v0')
-algorithm = "dqn"
-agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn")
-# algorithm = "ppo"
-# agent = PPO(env, restore={"actor":"zoo/ppo/actor_ppobest_model_ppo", "critic":"zoo/ppo/critic_ppobest_model_ppo"})
-
+env = gym.make(env_name)
+agent = None
+if(algorithm == "dqn"):
+    agent = VanillaDQN(env, restore=f"good_zoo/dqn/{args.env}/best_model_dqn")
+elif(algorithm == "ppo"):
+    agent = PPO(env, restore={"actor":f"good_zoo/ppo/{args.env}/actor_ppobest_model_ppo", "critic":f"good_zoo/ppo/{args.env}/critic_ppobest_model_ppo"})
 
 observation = env.reset()
-
 done = False
 total_reward = 0
 frames = []
@@ -56,6 +65,7 @@ while not done:
     action = get_action(observation, agent)
     observation, reward, done, _ = env.step(action)
     total_reward += reward
+    sleep(0.01)
 display_frames_as_gif(frames, f"media/gif/{algorithm}.gif")
 print(f"Total reward: {total_reward}, Done flag: {done}")
 
@@ -72,11 +82,12 @@ for i in range(100):
     rewards_list.append(total_reward)
     print(f"Total reward: {total_reward}, Done flag: {done}")
 
+print(f"Mean reward for 100 episode: {np.mean(rewards_list)}")
 plt.clf()
 plt.plot([i+1 for i in range(100)], rewards_list)
 plt.xlabel("Epochs")
 plt.ylabel("Reward")
-plt.savefig("./zoo/dqn/best_model_dqn_testing.png")
+plt.savefig("./good_zoo/dqn/best_model_dqn_testing.png")
 plt.show()
 
 # env.close()
