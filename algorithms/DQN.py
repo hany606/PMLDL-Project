@@ -13,6 +13,7 @@ from copy import deepcopy
 import random
 from math import tanh
 import wandb
+import os
 # from torch.utils.tensorboard import SummaryWriter
 
 np.random.seed(0)
@@ -100,6 +101,7 @@ class VanillaDQN:
             # self.target_net = deepcopy(self.net)
             obs = self.env.reset()
             epoch_reward = 0
+            original_reward = 0
             for t in range(num_steps):
                 if(render):
                     self.env.render()
@@ -121,6 +123,7 @@ class VanillaDQN:
 
                 # print(reward, abs(observation[0]-0.5), abs(observation[1])*2)
                 epoch_reward += reward
+                original_reward += r
                 # Store the transition (s_t, a_t, r_t, s_{t+1})
                 self.replay.add(list(deepcopy(obs)), list([action]), reward, list(observation))
                 obs = deepcopy(observation)
@@ -143,21 +146,27 @@ class VanillaDQN:
 
                                     
                 if(done or t == num_steps-1):
-                    print(f"Epoch {i+1} (reward): {epoch_reward}")
-                    if(wandb_flag):
-                        wandb.log({"epoch_reward": epoch_reward})
                     reward_list.append(epoch_reward)
-                    if(self.best_reward < epoch_reward and save_flag):
+                    avg_reward = np.mean(reward_list[-50:])
+                    print(f"Epoch {i+1} (reward): {original_reward}, (mod_reward): {epoch_reward}, (mean of the last 50 epoch) {avg_reward}")
+                    if(wandb_flag):
+                        wandb.log({"epoch_reward": original_reward})
+                    if(self.best_reward < original_reward and save_flag):
                         self.save(save_file_path, save_file_name)
-                        self.best_reward = epoch_reward
+                        self.best_reward = original_reward
                     break
 
         if(return_rewards):
             return reward_list
 
     def save(self, path, name):
+        # TODO: bug as it saves empty folders, and does not save in them, easy to fix, but you need to change run_agent.py file as well
+        log_dir = os.path.join(path, "dqn")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir + '/')
+
         print(f"Saved the model to {path+name}")
-        torch.save(self.net, path+name)
+        torch.save(self.net, log_dir+name)
 
 if __name__ == '__main__':
     pass
