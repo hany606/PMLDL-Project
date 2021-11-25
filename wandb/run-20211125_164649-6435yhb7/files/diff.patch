@@ -1,0 +1,156 @@
+diff --git a/algorithms/DQN.py b/algorithms/DQN.py
+index dccd0db..293fb5a 100644
+--- a/algorithms/DQN.py
++++ b/algorithms/DQN.py
+@@ -23,13 +23,13 @@ class Net(nn.Module):
+         super(Net, self).__init__()
+         self._input_layer = nn.Linear(observations_dim, hidden_dim)
+         self._hidden1 = nn.Linear(hidden_dim, hidden_dim)
+-        # self._hidden2 = nn.Linear(64, 32)
+-        self._output_layer = nn.Linear(hidden_dim,actions_dim)
++        self._hidden2 = nn.Linear(hidden_dim, 2*hidden_dim)
++        self._output_layer = nn.Linear(2*hidden_dim,actions_dim)
+ 
+     def forward(self, x):
+         x = F.relu(self._input_layer(x))
+         x = F.relu(self._hidden1(x))
+-        # x = F.relu(self._hidden2(x))
++        x = F.relu(self._hidden2(x))
+         x = self._output_layer(x)
+         return x
+ 
+diff --git a/media/gif/dqn.gif b/media/gif/dqn.gif
+index 49ebd3f..6635992 100644
+Binary files a/media/gif/dqn.gif and b/media/gif/dqn.gif differ
+diff --git a/run_agent.py b/run_agent.py
+index 34477d4..7717ebe 100644
+--- a/run_agent.py
++++ b/run_agent.py
+@@ -39,9 +39,9 @@ def get_action(state, policy=None):
+         return policy.sample_action(state)
+ 
+ # https://github.com/openai/gym/wiki/MountainCar-v0
+-env = gym.make('MountainCar-v0')
++env = gym.make('CartPole-v1')
+ algorithm = "dqn"
+-agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn")
++agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn1")
+ # algorithm = "ppo"
+ # agent = PPO(env, restore={"actor":"zoo/ppo/actor_ppobest_model_ppo", "critic":"zoo/ppo/critic_ppobest_model_ppo"})
+ 
+@@ -76,7 +76,7 @@ plt.clf()
+ plt.plot([i+1 for i in range(100)], rewards_list)
+ plt.xlabel("Epochs")
+ plt.ylabel("Reward")
+-plt.savefig("./zoo/dqn/best_model_dqn_testing.png")
++plt.savefig("./zoo/dqn/best_model_dqn_testing1.png")
+ plt.show()
+ 
+ # env.close()
+diff --git a/train.py b/train.py
+index e4f2a30..635568e 100644
+--- a/train.py
++++ b/train.py
+@@ -8,9 +8,9 @@ import wandb
+ 
+ 
+ wandb_experiment_config = {"algorithm": 
+-                                        "PPO"#"DQN"
++                                "DQN"
+                           }
+-env_name = "MountainCar-v0"
++env_name = "CartPole-v1"
+ notes = f"Running RL algorithm ({wandb_experiment_config['algorithm']}) for env: {env_name}"
+ 
+ wandb.init(
+@@ -26,8 +26,8 @@ wandb.init(
+ 
+ # https://github.com/openai/gym/wiki/MountainCar-v0
+ env = gym.make(env_name)
+-# dqn_agent = VanillaDQN(env, hidden_dim=64)
+-ppo_agent = PPO(env)
++dqn_agent = VanillaDQN(env, hidden_dim=64)
++#ppo_agent = PPO(env)
+ 
+ # After testing with the original reward of the environment, nothing was improved in training
+ # So, I have changed the reward function, to test different behavior and found some improvements
+@@ -40,43 +40,43 @@ ppo_agent = PPO(env)
+ reward_shaping_func = lambda r, obs: r + abs(obs[1])*10-abs(obs[0]-0.5) 
+ special_termination_condition = lambda obs: obs[0] > 0.48
+ 
+-num_epochs = 500
+-batch_size = 1000
+-target_update_freq = 5000
+-eps_prob = 0.1000
+-learning_rate = 0.003
+-num_steps = 200
++num_epochs = 1000
++batch_size = 256
++target_update_freq = 1
++eps_prob = 0.85
++learning_rate = 0.002
++num_steps = 500
+ # With num_steps=200 it improved the training and increased the reward
+-# rewards = dqn_agent.train(  return_rewards=True, 
++rewards = dqn_agent.train(  return_rewards=True, 
++                            save_flag=True, 
++                            render=False, 
++                            save_file_path="./zoo/dqn/", 
++                            save_file_name="best_model_dqn1",
++                            num_epochs=num_epochs, 
++                            batch_size=batch_size, 
++                            target_update_freq=target_update_freq,  
++                            eps_prob=eps_prob, 
++                            learning_rate=learning_rate, 
++                            num_steps=num_steps,
++                            reward_shaping_func= None,
++                            special_termination_condition=None,
++                            wandb_flag=True,
++                          )
++# rewards = ppo_agent.train(  return_rewards=True, 
+ #                             save_flag=True, 
+ #                             render=False, 
+-#                             save_file_path="./zoo/dqn/", 
+-#                             save_file_name="best_model_dqn",
+-#                             num_epochs=num_epochs, 
+-#                             batch_size=batch_size, 
+-#                             target_update_freq=target_update_freq,  
+-#                             eps_prob=eps_prob, 
+-#                             learning_rate=learning_rate, 
+-#                             num_steps=num_steps,
++#                             save_file_path="./zoo/ppo/", 
++#                             save_file_name="best_model_ppo",
+ #                             reward_shaping_func=reward_shaping_func,
+ #                             special_termination_condition=special_termination_condition,
+ #                             wandb_flag=True,
++#                             num_steps = num_steps,
+ #                           )
+-rewards = ppo_agent.train(  return_rewards=True, 
+-                            save_flag=True, 
+-                            render=False, 
+-                            save_file_path="./zoo/ppo/", 
+-                            save_file_name="best_model_ppo",
+-                            reward_shaping_func=reward_shaping_func,
+-                            special_termination_condition=special_termination_condition,
+-                            wandb_flag=True,
+-                            num_steps = num_steps,
+-                          )
+ 
+ # dqn_agent.train(num_epochs=500, batch_size=128, target_update_freq=5000, render=True, eps_prob=0.1, learning_rate=0.003, num_steps=1000)
+ 
+-# plt.plot([i+1 for i in range(num_epochs)], rewards)
+-# plt.xlabel("Epochs")
+-# plt.ylabel("Reward")
+-# plt.savefig("./zoo/dqn/best_model_dqn.png")
+-# plt.show()
++plt.plot([i+1 for i in range(num_epochs)], rewards)
++plt.xlabel("Epochs")
++plt.ylabel("Reward")
++plt.savefig("./zoo/dqn/best_model_dqn1.png")
++plt.show()
+diff --git a/zoo/dqn/best_model_dqn b/zoo/dqn/best_model_dqn
+index 89e68b3..c7d3889 100644
+Binary files a/zoo/dqn/best_model_dqn and b/zoo/dqn/best_model_dqn differ
+diff --git a/zoo/dqn/best_model_dqn_testing.png b/zoo/dqn/best_model_dqn_testing.png
+index 48b5e0b..d028409 100644
+Binary files a/zoo/dqn/best_model_dqn_testing.png and b/zoo/dqn/best_model_dqn_testing.png differ

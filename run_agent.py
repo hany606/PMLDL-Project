@@ -39,9 +39,9 @@ def get_action(state, policy=None):
         return policy.sample_action(state)
 
 # https://github.com/openai/gym/wiki/MountainCar-v0
-env = gym.make('MountainCar-v0')
+env = gym.make('CartPole-v1')
 algorithm = "dqn"
-agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn")
+agent = VanillaDQN(env, restore="zoo/dqn/best_model_dqn1")
 # algorithm = "ppo"
 # agent = PPO(env, restore={"actor":"zoo/ppo/actor_ppobest_model_ppo", "critic":"zoo/ppo/critic_ppobest_model_ppo"})
 
@@ -76,7 +76,7 @@ plt.clf()
 plt.plot([i+1 for i in range(100)], rewards_list)
 plt.xlabel("Epochs")
 plt.ylabel("Reward")
-plt.savefig("./zoo/dqn/best_model_dqn_testing.png")
+plt.savefig("./zoo/dqn/best_model_dqn_testing1.png")
 plt.show()
 
 # env.close()

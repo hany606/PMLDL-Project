@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.4.0-89-generic-x86_64-with-glibc2.27",
+    "python": "3.8.12",
+    "heartbeatAt": "2021-11-24T20:03:59.290649",
+    "startedAt": "2021-11-24T20:03:55.709280",
+    "docker": null,
+    "gpu": "GeForce 930M",
+    "gpu_count": 1,
+    "cpu_count": 4,
+    "cuda": "10.2.89",
+    "args": [],
+    "state": "running",
+    "program": "train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "git@github.com:hany606/PMLDL-Project.git",
+        "commit": "2ad0abfd5db2c493104a99604d517c7fccec8570"
+    },
+    "email": "ahmad12hamdan99@gmail.com",
+    "root": "/home/ahmad/IU/PMLDL/PMLDL-Project",
+    "host": "workstation",
+    "username": "ahmad",
+    "executable": "/usr/bin/python3"
+}
