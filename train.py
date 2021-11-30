@@ -94,8 +94,13 @@ elif(algorithm == "ppo"):
     update_num_epochs = config["update_num_epochs"]
     learning_rate = config["learning_rate"]
     batch_size = config["batch_size"]
+    vf_coef = config["vf_coef"]
+    clip_range = config["clip_range"]
+    gae_lambda = config["gae_lambda"]
+    gamma = config["gamma"]
 
-    agent = PPO(env, lr=learning_rate, n_steps=num_steps, batch_size=batch_size, n_epochs=num_epochs)
+    agent = PPO(env, lr=learning_rate, n_steps=num_steps, batch_size=batch_size, n_epochs=num_epochs,
+                gae_lambda=gae_lambda, clip_range=clip_range, gamma=gamma, vf_coef=vf_coef)
     rewards = agent.train(  return_rewards=True, 
                             save_flag=True, 
                             render=False, 

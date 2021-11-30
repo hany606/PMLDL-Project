@@ -204,6 +204,8 @@ class PPO:
         value = torch.squeeze(value).item()
         return action, probs, value
 
+    # Just for evaluation usage (feedforward only for the actor network)
+    # TODO: remove it later
     def sample_action(self, observation):
         state = torch.tensor([observation], dtype=torch.float).to(self.actor_net.device)
         distribution = self.actor_net(state)
