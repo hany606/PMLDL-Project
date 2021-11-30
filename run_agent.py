@@ -8,6 +8,7 @@ import gym
 import numpy as np
 from algorithms.DQN import VanillaDQN
 from algorithms.PPO import PPO
+from algorithms.SAC import SAC
 from torch import load
 from time import time
 import matplotlib.pyplot as plt
@@ -55,6 +56,10 @@ if(algorithm == "dqn"):
     agent = VanillaDQN(env, restore=f"good_zoo/dqn/{args.env}/best_model_dqn")
 elif(algorithm == "ppo"):
     agent = PPO(env, restore={"actor":f"good_zoo/ppo/{args.env}/actor_ppobest_model_ppo", "critic":f"good_zoo/ppo/{args.env}/critic_ppobest_model_ppo"})
+elif(algorithm == "sac"):
+    agent = SAC(env=env, restore={"actor":f"good_zoo/sac/{args.env}/actor_sacbest_model_sac", "critic_1":f"good_zoo/sac/{args.env}/critic1_sacbest_model_sac", "critic_2":f"good_zoo/sac/{args.env}/critic2_sacbest_model_sac",
+                              "target_value":f"good_zoo/sac/{args.env}/target_value_sacbest_model_sac",
+                              "value":f"good_zoo/sac/{args.env}/value_sacbest_model_sac"})
 
 observation = env.reset()
 done = False

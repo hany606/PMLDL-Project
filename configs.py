@@ -35,7 +35,16 @@ class Config:
                                             "num_steps": 100,
                                             "special_termination_condition": None,
                                             "reward_shaping_func": None
-                                            }
+                                            },
+                                    "sac": {
+                                            "num_steps": 100,
+                                            "num_epochs": num_epochs,
+                                            "special_termination_condition": None,
+                                            "reward_shaping_func": None,
+                                            "alpha": 0.0003,
+                                            "beta": 0.0003,
+                                            "tau": 0.005,
+                                            },
                                     },
                         "mountaincar": {
                                     "ppo": {
@@ -56,7 +65,16 @@ class Config:
                                             "num_steps": 500,
                                             "special_termination_condition": special_termination_condition,
                                             "reward_shaping_func": reward_shaping_func
-                                            }
+                                            },
+                                    "sac": {
+                                            "num_steps": 100,
+                                            "num_epochs": num_epochs,
+                                            "special_termination_condition": special_termination_condition,
+                                            "reward_shaping_func": reward_shaping_func,
+                                           "alpha": 0.0003,
+                                            "beta": 0.0003,
+                                            "tau": 0.005,
+                                            },
                                     },
 
                         "acrobot": {
@@ -78,7 +96,16 @@ class Config:
                                             "num_steps": 100,
                                             "special_termination_condition": None,
                                             "reward_shaping_func": acrobot_reward_shaping_func
-                                            }
+                                            },
+                                    "sac": {
+                                            "num_steps": 100,
+                                            "num_epochs": num_epochs,
+                                            "special_termination_condition": None,
+                                            "reward_shaping_func": acrobot_reward_shaping_func,
+                                            "alpha": 0.0003,
+                                            "beta": 0.0003,
+                                            "tau": 0.005,
+                                            },
                                     },
                         
                         }

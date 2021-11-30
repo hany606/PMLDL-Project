@@ -1,3 +1,4 @@
+# Not working properly unfortunately!
 import numpy as np
 import os
 import torch as T
@@ -11,6 +12,7 @@ import os
 import torch as T
 import torch.nn.functional as F
 import numpy as np
+import wandb
 # from buffer import ReplayBuffer
 # from networks import ActorNetwork, CriticNetwork, ValueNetwork
 
@@ -158,6 +160,11 @@ class ActorNetwork(nn.Module):
         sigma = self.sigma(prob)
 
         sigma = T.clamp(sigma, min=self.reparam_noise, max=1)
+        # TODO: quick fix but not correct -> need to debug why the mu and sigma are turning to nans!
+        # if(T.isnan(mu).any()):
+        mu = T.nan_to_num(mu, nan=0.0)
+        # if(T.isnan(mu)):
+        sigma = T.nan_to_num(sigma, nan=1.0)
 
         return mu, sigma
 
@@ -184,18 +191,20 @@ class ActorNetwork(nn.Module):
         self.load_state_dict(T.load(self.checkpoint_file))
 
 
-class Agent():
+class SAC():
     def __init__(self, alpha=0.0003, beta=0.0003, input_dims=[8],
             env=None, gamma=0.99, n_actions=2, max_size=1000000, tau=0.005,
-            layer1_size=256, layer2_size=256, batch_size=256, reward_scale=2):
+            layer1_size=256, layer2_size=256, batch_size=256, reward_scale=2,
+            restore=None):
         self.gamma = gamma
         self.tau = tau
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
         self.batch_size = batch_size
         self.n_actions = n_actions
 
+        # TODO: not the correct way to get of course the maximum action, but did not find the appropriate function in gym env (Sorry for that)
         self.actor = ActorNetwork(alpha, input_dims, n_actions=n_actions,
-                    name='actor', max_action=env.action_space.high)
+                    name='actor', max_action=max([env.action_space.sample() for i in range(10)]))
         self.critic_1 = CriticNetwork(beta, input_dims, n_actions=n_actions,
                     name='critic_1')
         self.critic_2 = CriticNetwork(beta, input_dims, n_actions=n_actions,
@@ -205,12 +214,29 @@ class Agent():
 
         self.scale = reward_scale
         self.update_network_parameters(tau=1)
+        self.env = env
+        self.best_reward = -1e8
+        self.best_avg_reward = -1e8
 
-    def choose_action(self, observation):
+        self.compare_eps = 1e-8
+
+        if(restore is not None):
+            self.restore(restore)
+
+    def restore(self, restore):
+        self.actor = T.load(restore["actor"])
+        self.critic_1 = T.load(restore["critic_1"])
+        self.critic_2 = T.load(restore["critic_2"])
+        self.value = T.load(restore["value"])
+        self.target_value = T.load(restore["target_value"])
+
+
+
+    def sample_action(self, observation):
         state = T.Tensor([observation]).to(self.actor.device)
         actions, _ = self.actor.sample_normal(state, reparameterize=False)
 
-        return actions.cpu().detach().numpy()[0]
+        return np.argmax(actions.cpu().detach().numpy()[0])
 
     def remember(self, state, action, reward, new_state, done):
         self.memory.store_transition(state, action, reward, new_state, done)
@@ -238,6 +264,43 @@ class Agent():
         self.target_value.save_checkpoint()
         self.critic_1.save_checkpoint()
         self.critic_2.save_checkpoint()
+
+    def save(self, path, name):
+        # TODO: bug as it saves empty folders, and does not save in them, easy to fix, but you need to change run_agent.py file as well
+        actor_log_dir = os.path.join(path, "actor_sac")
+        critic_log_dir = os.path.join(path, "critic_sac")
+        value_log_dir = os.path.join(path, "value_sac")
+        target_value_log_dir = os.path.join(path, "target_value_sac")
+        critic_1_log_dir = os.path.join(path, "critic1_sac")
+        critic_2_log_dir = os.path.join(path, "critic2_sac")
+
+        if not os.path.exists(actor_log_dir):
+            os.makedirs(actor_log_dir + '/')
+        if not os.path.exists(critic_log_dir):
+            os.makedirs(critic_log_dir + '/')
+        if not os.path.exists(value_log_dir):
+            os.makedirs(value_log_dir + '/')
+        if not os.path.exists(target_value_log_dir):
+            os.makedirs(target_value_log_dir + '/')
+        if not os.path.exists(critic_1_log_dir):
+            os.makedirs(critic_1_log_dir + '/')
+        if not os.path.exists(critic_2_log_dir):
+            os.makedirs(critic_2_log_dir + '/')
+
+
+        print(f"Saved actor model to {actor_log_dir}")
+        T.save(self.actor, actor_log_dir+name)
+        print(f"Saved value model to {value_log_dir}")
+        T.save(self.value, value_log_dir+name)
+        
+        print(f"Saved target value model to {target_value_log_dir}")
+        T.save(self.target_value, target_value_log_dir+name)
+
+
+        print(f"Saved critic1 model to {critic_1_log_dir}")
+        T.save(self.critic_1, critic_1_log_dir+name)
+        print(f"Saved critic2 model to {critic_2_log_dir}")
+        T.save(self.critic_2, critic_2_log_dir+name)
 
     def load_models(self):
         print('.... loading models ....')
@@ -305,6 +368,46 @@ class Agent():
 
         self.update_network_parameters()
 
+    def train(self, n_epochs=100, wandb_flag=False,
+                    save_flag=False, save_file_name=None, save_file_path=None, return_rewards=False,
+                    num_steps=200,
+                    reward_shaping_func=None, 
+                    special_termination_condition=None, 
+             ):
+        original_reward_list = []
+        for epoch in range(n_epochs):
+            observation = self.env.reset()
+            done = False
+            epoch_original_reward = 0
+            total_num_steps = 0
+            while not done and total_num_steps < num_steps:
+                total_num_steps += 1
+                action = self.sample_action(observation)
+                observation_, r, done, info = self.env.step(action)
+                reward = None
+                if(reward_shaping_func is None):
+                    reward = r
+                else:
+                    reward = reward_shaping_func(r, observation)
+
+                if(special_termination_condition is not None and special_termination_condition(observation)):
+                        done = True
+                epoch_original_reward += reward
+                self.remember(observation, action, reward, observation_, done)
+                self.learn()
+                observation = observation_
+            original_reward_list.append(epoch_original_reward)
+            avg_reward = np.mean(original_reward_list[-50:])
+            print(f"Epoch {epoch} (reward): {epoch_original_reward}, (mean of the last 50 epoch) {avg_reward}")
+            if(wandb_flag):
+                wandb.log({"epoch_reward": epoch_original_reward})
+            if(self.best_reward - epoch_original_reward <= self.compare_eps and self.best_avg_reward - avg_reward <= self.compare_eps and save_flag):
+                self.save(save_file_path, save_file_name)
+                self.best_reward = epoch_original_reward
+                self.best_avg_reward = avg_reward
+        if(return_rewards):
+            return original_reward_list
+
 
 
 
@@ -317,7 +420,7 @@ from gym import wrappers
 
 if __name__ == '__main__':
     env = gym.make('Acrobot-v1')
-    agent = Agent(input_dims=env.observation_space.shape, env=env,
+    agent = SAC(input_dims=env.observation_space.shape, env=env,
             n_actions=env.action_space.n)
     n_games = 250
     # uncomment this line and do a mkdir tmp && mkdir tmp/video if you want to
@@ -329,7 +432,7 @@ if __name__ == '__main__':
 
     best_score = env.reward_range[0]
     score_history = []
-    load_checkpoint = True
+    load_checkpoint = False
 
     if load_checkpoint:
         agent.load_models()
@@ -340,7 +443,7 @@ if __name__ == '__main__':
         done = False
         score = 0
         while not done:
-            action = agent.choose_action(observation)
+            action = agent.sample_action(observation)
             observation_, reward, done, info = env.step(action)
             score += reward
             agent.remember(observation, action, reward, observation_, done)
@@ -352,8 +455,8 @@ if __name__ == '__main__':
 
         if avg_score > best_score:
             best_score = avg_score
-            if not load_checkpoint:
-                agent.save_models()
+            # if not load_checkpoint:
+            #     agent.save_models()
 
         print('episode ', i, 'score %.1f' % score, 'avg_score %.1f' % avg_score)
 

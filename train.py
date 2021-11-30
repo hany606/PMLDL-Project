@@ -24,6 +24,7 @@ import gym
 from time import sleep
 from algorithms.DQN import VanillaDQN
 from algorithms.PPO import PPO
+from algorithms.SAC import SAC
 import matplotlib.pyplot as plt
 import wandb
 from configs import Config as cfg
@@ -63,14 +64,14 @@ config = configs[args.env][args.algo]
 
 num_epochs = config["num_epochs"]
 num_steps = config["num_steps"]
-learning_rate = config["learning_rate"]
-batch_size = config["batch_size"]
 config_reward_shaping_func = config["reward_shaping_func"]
 config_special_termination_condition = config["special_termination_condition"]
 
 if(algorithm == "dqn"):
     target_update_freq = config["target_update_freq"]
     eps_prob = config["eps_prob"]
+    learning_rate = config["learning_rate"]
+    batch_size = config["batch_size"]
 
     agent = VanillaDQN(env, hidden_dim=64)
     # With num_steps=200 it improved the training and increased the reward
@@ -91,6 +92,8 @@ if(algorithm == "dqn"):
                                     )
 elif(algorithm == "ppo"):
     update_num_epochs = config["update_num_epochs"]
+    learning_rate = config["learning_rate"]
+    batch_size = config["batch_size"]
 
     agent = PPO(env, lr=learning_rate, n_steps=num_steps, batch_size=batch_size, n_epochs=num_epochs)
     rewards = agent.train(  return_rewards=True, 
@@ -104,6 +107,23 @@ elif(algorithm == "ppo"):
                             num_steps = num_steps,
                             update_num_epochs=update_num_epochs
                             )
+
+elif(algorithm == "sac"):
+    alpha = config["alpha"]
+    beta = config["beta"]
+    tau = config["tau"]
+    agent = SAC(env=env, alpha=alpha, beta=beta, tau=tau, input_dims=env.observation_space.shape, n_actions=env.action_space.n)
+    rewards = agent.train(  return_rewards=True, 
+                            save_flag=True, 
+                            save_file_path=f"./zoo/sac/{args.env}", 
+                            save_file_name="best_model_sac",
+                            reward_shaping_func=config_reward_shaping_func,#reward_shaping_func,
+                            special_termination_condition=config_special_termination_condition,#special_termination_condition,
+                            wandb_flag=wandb_flag,
+                            num_steps = num_steps,
+                            n_epochs=num_epochs
+                            )
+
 
 # dqn_agent.train(num_epochs=500, batch_size=128, target_update_freq=5000, render=True, eps_prob=0.1, learning_rate=0.003, num_steps=1000)
 
