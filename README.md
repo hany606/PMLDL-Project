@@ -5,14 +5,31 @@ This repository is for Practical Machine Learning and Deep Learning course proje
 
 ├── media: photos and gifs
 
-├── models: different models and algorithms
+├── algorithms: different algorithms
 
 └── zoo: trained agents
 
+### How to Run it?
 
-### Algorithms:
+In order to train
+```bash
+python3 train.py --algo <algo> --env <env>
+```
+* replace \<algo> with (ppo, sac, or dqn)
+  
+* replace \<env> with (cartpole, mountaincar, acrobot)
+  
+  
+In order to evaluate and render the episode of the agent with the trained model. The default directory is good_zoo directory, to change it you need to change the code. Later, we will make it through cli
+```bash
+python3 run_agent.py --algo <algo> --env <env>
+```
 
-#### DQN:
+* replace \<algo> with (ppo, sac, or dqn)
+  
+* replace \<env> with (cartpole, mountaincar, acrobot)
+
+#### A demo for DQN:
 
 Trained Agent for cartpole:
 
@@ -35,5 +52,5 @@ Testing reward:
 - [X] Add support for wandb or Tensorboard
 - [X] Create cli interface for run_agent.py
 - [X] Implement PPO
-- [0.3] Implement SAC
-- [0.5] Create Benchmark using different envs and between different agorithms
+- [X] Implement SAC
+- [X] Create Benchmark using different envs and between different agorithms
