@@ -31,9 +31,16 @@ python3 run_agent.py --algo <algo> --env <env>
 
 #### A demo for DQN:
 
-Trained Agent for cartpole:
+Trained Agent for MountainCar:
 
 ![Trained Agent](https://github.com/hany606/PMLDL-Project/blob/main/media/gif/dqn.gif)
+
+#### A demo for PPO:
+
+Trained Agent for cartpole:
+
+![Trained Agent](https://github.com/hany606/PMLDL-Project/blob/main/media/gif/ppo.gif)
+
 
 Rewards:
 
